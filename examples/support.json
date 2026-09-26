@@ -1,0 +1,32 @@
+{
+  "state": {
+    "ticket": {
+      "subject": "Charged twice this month",
+      "body": "I see two charges for my subscription on my card statement. Can you refund one?"
+    }
+  },
+  "questions": {
+    "category": {
+      "type": "choice",
+      "instructions": "Which team should handle this ticket?",
+      "criteria": {
+        "technical": "Bugs, errors, or product not working",
+        "account": "Login, profile, or account settings",
+        "billing": "Charges, refunds, invoices, or payment methods"
+      }
+    },
+    "urgency": {
+      "type": "score",
+      "instructions": "How urgent is this ticket?",
+      "criteria": [
+        "Not urgent; general question",
+        "Should be handled soon",
+        "Needs immediate attention"
+      ]
+    },
+    "angry": {
+      "type": "noul",
+      "instructions": "Is the customer angry?"
+    }
+  }
+}
