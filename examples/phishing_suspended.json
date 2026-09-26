@@ -1,0 +1,8 @@
+{
+  "email": {
+    "from": "IT Support <helpdesk@micros0ft-security.com>",
+    "to": "mike@example.com",
+    "subject": "Action required: your mailbox will be suspended",
+    "body": "Dear user,\n\nWe detected unusual sign-in activity on your account. To avoid suspension within 24 hours, verify your identity by entering your password at the link below.\n\nhttps://micros0ft-security.com/verify\n\nThank you,\nIT Support"
+  }
+}

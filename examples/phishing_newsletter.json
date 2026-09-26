@@ -1,0 +1,8 @@
+{
+  "email": {
+    "from": "GitHub <noreply@github.com>",
+    "to": "mike@example.com",
+    "subject": "[leftmike/gjevt] New issue opened",
+    "body": "A new issue was opened in leftmike/gjevt: \"Support batching multiple states\".\n\nView it on GitHub: https://github.com/leftmike/gjevt/issues/1\n\nYou are receiving this because you are watching this repository."
+  }
+}

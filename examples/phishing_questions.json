@@ -1,0 +1,31 @@
+{
+  "phishing": {
+    "type": "noul",
+    "instructions": "Is this email a phishing attempt?"
+  },
+  "tactic": {
+    "type": "choice",
+    "instructions": "Which manipulation tactic does the email rely on most?",
+    "criteria": {
+      "urgency": "Threatens a deadline or consequence to rush the reader",
+      "authority": "Impersonates a trusted person, company, or department",
+      "reward": "Promises money, prizes, or something free",
+      "curiosity": "Teases content the reader will want to open",
+      "none": "No manipulation tactic is used"
+    }
+  },
+  "sender_mismatch": {
+    "type": "noul",
+    "instructions": "Does the sender's domain differ from the organization it claims to represent?"
+  },
+  "risk": {
+    "type": "score",
+    "instructions": "How much harm could result if the recipient follows the email's instructions?",
+    "criteria": [
+      "None; the email is harmless",
+      "Minor; spam or unwanted marketing",
+      "Moderate; personal information could be exposed",
+      "Severe; credentials or money could be stolen"
+    ]
+  }
+}

@@ -101,23 +101,102 @@ func TestDecideHTTPError(t *testing.T) {
 }
 
 func TestRun(t *testing.T) {
+	var got map[string]any
+	c, done := newTestServer(t, http.StatusOK, testResponse, &got)
+	defer done()
+
+	var out bytes.Buffer
+	err := run(context.Background(), c, "examples/support_questions.json",
+		[]string{"examples/support_billing.json"}, nil, &out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := got["questions"].(map[string]any)["urgency"]; !ok {
+		t.Errorf("got questions %v", got["questions"])
+	}
+	if _, ok := got["state"].(map[string]any)["ticket"]; !ok {
+		t.Errorf("got state %v", got["state"])
+	}
+
+	var res result
+	if err := json.Unmarshal(out.Bytes(), &res); err != nil {
+		t.Fatal(err)
+	}
+	if res.State != "examples/support_billing.json" || res.ID != "gen-dec-1" {
+		t.Errorf("got %+v", res)
+	}
+}
+
+func TestRunMultipleStates(t *testing.T) {
 	c, done := newTestServer(t, http.StatusOK, testResponse, nil)
 	defer done()
 
 	var out bytes.Buffer
-	if err := run(context.Background(), c, []string{"examples/support.json"}, nil, &out); err != nil {
+	err := run(context.Background(), c, "examples/support_questions.json",
+		[]string{"examples/support_billing.json", "examples/support_login.json"}, nil, &out)
+	if err != nil {
 		t.Fatal(err)
-	}
-	var resp DecisionResponse
-	if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
-		t.Fatal(err)
-	}
-	if resp.ID != "gen-dec-1" {
-		t.Errorf("got %+v", resp)
 	}
 
-	out.Reset()
-	if err := run(context.Background(), c, nil, strings.NewReader("{not json"), &out); err == nil {
-		t.Error("expected error for invalid stdin")
+	dec := json.NewDecoder(&out)
+	var states []string
+	for dec.More() {
+		var res result
+		if err := dec.Decode(&res); err != nil {
+			t.Fatal(err)
+		}
+		states = append(states, res.State)
+	}
+	if len(states) != 2 || states[0] != "examples/support_billing.json" ||
+		states[1] != "examples/support_login.json" {
+		t.Errorf("got states %v", states)
+	}
+}
+
+func TestRunStdin(t *testing.T) {
+	var got map[string]any
+	c, done := newTestServer(t, http.StatusOK, testResponse, &got)
+	defer done()
+
+	var out bytes.Buffer
+	err := run(context.Background(), c, "examples/support_questions.json", nil,
+		strings.NewReader(`{"ticket": "help"}`), &out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got["state"].(map[string]any)["ticket"] != "help" {
+		t.Errorf("got state %v", got["state"])
+	}
+	if !strings.Contains(out.String(), `"state": "-"`) {
+		t.Errorf("got %s", out.String())
+	}
+}
+
+func TestRunErrors(t *testing.T) {
+	c, done := newTestServer(t, http.StatusOK, testResponse, nil)
+	defer done()
+
+	cases := []struct {
+		name      string
+		questions string
+		states    []string
+		stdin     string
+		err       string
+	}{
+		{name: "bad stdin", questions: "examples/support_questions.json", stdin: "{not json",
+			err: "-:"},
+		{name: "both stdin", questions: "-", stdin: "{}", err: "both"},
+		{name: "missing state", questions: "examples/support_questions.json",
+			states: []string{"missing.json"}, err: "missing.json"},
+		{name: "missing questions", questions: "missing.json", err: "missing.json"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := run(context.Background(), c, tc.questions, tc.states,
+				strings.NewReader(tc.stdin), io.Discard)
+			if err == nil || !strings.Contains(err.Error(), tc.err) {
+				t.Fatalf("got error %v, want %q", err, tc.err)
+			}
+		})
 	}
 }

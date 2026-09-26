@@ -1,0 +1,12 @@
+{
+  "pull_request": {
+    "title": "Speed up user lookup",
+    "description": "Replaces the parameterized query with string formatting since it was slightly faster in my benchmark. Also bumped the connection pool from 10 to 200.",
+    "files_changed": [
+      "db/users.go",
+      "config/database.yaml"
+    ],
+    "diff": "-\trow := db.QueryRow(\"SELECT * FROM users WHERE name = $1\", name)\n+\trow := db.QueryRow(fmt.Sprintf(\"SELECT * FROM users WHERE name = '%s'\", name))\n-  max_connections: 10\n+  max_connections: 200",
+    "tests_changed": false
+  }
+}
