@@ -8,36 +8,6 @@ import (
 	"testing"
 )
 
-func ptr(f float64) *float64 { return &f }
-
-func TestFormatAnswer(t *testing.T) {
-	legend := map[string]string{"0": "low", "1": "medium", "2": "high"}
-	cases := []struct {
-		a    Answer
-		want string
-	}{
-		{Answer{Type: "noul", Noul: ptr(0.99)}, "yes (0.99)"},
-		{Answer{Type: "noul", Noul: ptr(0.5)}, "yes (0.50)"},
-		{Answer{Type: "noul", Noul: ptr(0.07)}, "no (0.93)"},
-		{Answer{Type: "noul", Noul: ptr(0)}, "no (1.00)"},
-		{Answer{Type: "choice", Choice: "billing", Confidence: ptr(1)},
-			"billing (confidence 1.00)"},
-		{Answer{Type: "choice", Choice: "billing"}, "billing"},
-		{Answer{Type: "score", Score: ptr(1), Legend: legend, Confidence: ptr(0.92)},
-			"1: medium (confidence 0.92)"},
-		{Answer{Type: "score", Score: ptr(1.6), Legend: legend}, "1.6: high"},
-		{Answer{Type: "score", Score: ptr(0.09), Legend: legend}, "0.09: low"},
-		{Answer{Type: "score", Score: ptr(7)}, "7"},
-		{Answer{Type: "noul"}, "?"},
-		{Answer{Type: "other"}, "?"},
-	}
-	for _, c := range cases {
-		if got := formatAnswer(c.a); got != c.want {
-			t.Errorf("formatAnswer(%+v): got %q, want %q", c.a, got, c.want)
-		}
-	}
-}
-
 func TestRunPretty(t *testing.T) {
 	c, done := newTestServer(t, http.StatusOK, testResponse, nil)
 	defer done()

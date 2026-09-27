@@ -5,24 +5,26 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/leftmike/gjevt/jev"
 )
 
 func TestParseConfig(t *testing.T) {
 	cases := []struct {
 		name string
 		src  string
-		want Config
+		want jev.Config
 		err  string
 	}{
 		{
 			name: "defaults",
 			src:  `api_key = "k"`,
-			want: Config{APIKey: "k", BaseURL: "https://openrouter.ai/api", Model: "~typesafe/jev-latest"},
+			want: jev.Config{APIKey: "k"},
 		},
 		{
 			name: "all fields",
 			src:  "api_key = \"k\"\nbase_url = \"http://x\"\nmodel = \"typesafe/jev-1.13\"\n",
-			want: Config{APIKey: "k", BaseURL: "http://x", Model: "typesafe/jev-1.13"},
+			want: jev.Config{APIKey: "k", BaseURL: "http://x", Model: "typesafe/jev-1.13"},
 		},
 		{name: "empty key", src: defaultConfig, err: "api_key is not set"},
 		{name: "missing key", src: `model = "m"`, err: "api_key"},

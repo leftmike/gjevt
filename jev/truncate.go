@@ -1,4 +1,4 @@
-package main
+package jev
 
 import (
 	"encoding/json"
@@ -10,6 +10,18 @@ const maxStateSize = 96 * 1024
 func stateSize(state any) int {
 	b, _ := json.Marshal(state)
 	return len(b)
+}
+
+func copyState(state any) (any, error) {
+	b, err := json.Marshal(state)
+	if err != nil {
+		return nil, err
+	}
+	var cp any
+	if err := json.Unmarshal(b, &cp); err != nil {
+		return nil, err
+	}
+	return cp, nil
 }
 
 type leaf struct {

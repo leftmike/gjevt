@@ -1,4 +1,4 @@
-package main
+package jev
 
 import (
 	"bytes"
@@ -48,13 +48,40 @@ type DecisionResponse struct {
 	Usage    Usage             `json:"usage"`
 }
 
+const (
+	DefaultBaseURL = "https://openrouter.ai/api"
+	DefaultModel   = "~typesafe/jev-latest"
+)
+
+type Config struct {
+	APIKey  string
+	BaseURL string
+	Model   string
+}
+
 type Client struct {
 	cfg        Config
 	httpClient *http.Client
 }
 
-func NewClient(cfg Config) *Client {
-	return &Client{cfg: cfg, httpClient: http.DefaultClient}
+type Option func(*Client)
+
+func WithHTTPClient(hc *http.Client) Option {
+	return func(c *Client) { c.httpClient = hc }
+}
+
+func NewClient(cfg Config, opts ...Option) *Client {
+	if cfg.BaseURL == "" {
+		cfg.BaseURL = DefaultBaseURL
+	}
+	if cfg.Model == "" {
+		cfg.Model = DefaultModel
+	}
+	c := &Client{cfg: cfg, httpClient: http.DefaultClient}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
 }
 
 func (c *Client) Decide(ctx context.Context, req DecisionRequest) (*DecisionResponse, error) {
@@ -96,4 +123,33 @@ func (c *Client) Decide(ctx context.Context, req DecisionRequest) (*DecisionResp
 		return nil, err
 	}
 	return &resp, nil
+}
+
+func (c *Client) DecideTruncated(ctx context.Context, req DecisionRequest) (*DecisionResponse,
+	bool, error) {
+
+	resp, err := c.Decide(ctx, req)
+	if !errors.Is(err, ErrTooLong) {
+		return resp, false, err
+	}
+
+	req.State, err = copyState(req.State)
+	if err != nil {
+		return nil, false, err
+	}
+	truncated := false
+	for {
+		var shrunk bool
+		req.State, shrunk = truncateState(req.State,
+			min(stateSize(req.State)*3/4, maxStateSize))
+		if !shrunk {
+			return nil, truncated, ErrTooLong
+		}
+		truncated = true
+
+		resp, err = c.Decide(ctx, req)
+		if !errors.Is(err, ErrTooLong) {
+			return resp, truncated, err
+		}
+	}
 }

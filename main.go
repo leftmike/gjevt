@@ -9,12 +9,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/leftmike/gjevt/jev"
 )
 
 type result struct {
 	State     string `json:"state"`
 	Truncated bool   `json:"truncated,omitempty"`
-	*DecisionResponse
+	*jev.DecisionResponse
 }
 
 type options struct {
@@ -38,7 +40,7 @@ func main() {
 
 	cfg, err := loadConfig("gjevt.hcl")
 	if err == nil {
-		err = run(context.Background(), NewClient(cfg), opts, flag.Arg(0), flag.Args()[1:],
+		err = run(context.Background(), jev.NewClient(cfg), opts, flag.Arg(0), flag.Args()[1:],
 			os.Stdin, os.Stdout, os.Stderr)
 	}
 	if err != nil {
@@ -81,29 +83,10 @@ func readState(path string, stdin io.Reader) (any, error) {
 	return state, nil
 }
 
-func decide(ctx context.Context, c *Client, questions map[string]Question, state any,
-	skip bool) (*DecisionResponse, bool, error) {
-
-	truncated := false
-	for {
-		resp, err := c.Decide(ctx, DecisionRequest{State: state, Questions: questions})
-		if !errors.Is(err, ErrTooLong) || skip {
-			return resp, truncated, err
-		}
-
-		var shrunk bool
-		state, shrunk = truncateState(state, min(stateSize(state)*3/4, maxStateSize))
-		if !shrunk {
-			return nil, truncated, err
-		}
-		truncated = true
-	}
-}
-
-func run(ctx context.Context, c *Client, opts options, questionsPath string,
+func run(ctx context.Context, c *jev.Client, opts options, questionsPath string,
 	statePaths []string, stdin io.Reader, stdout, stderr io.Writer) error {
 
-	var questions map[string]Question
+	var questions map[string]jev.Question
 	if err := readJSON(questionsPath, stdin, &questions); err != nil {
 		return err
 	}
@@ -124,8 +107,15 @@ func run(ctx context.Context, c *Client, opts options, questionsPath string,
 			return err
 		}
 
-		resp, truncated, err := decide(ctx, c, questions, state, opts.skip)
-		if errors.Is(err, ErrTooLong) && opts.skip {
+		req := jev.DecisionRequest{State: state, Questions: questions}
+		var resp *jev.DecisionResponse
+		var truncated bool
+		if opts.skip {
+			resp, err = c.Decide(ctx, req)
+		} else {
+			resp, truncated, err = c.DecideTruncated(ctx, req)
+		}
+		if errors.Is(err, jev.ErrTooLong) && opts.skip {
 			fmt.Fprintf(stderr, "gjevt: %s: skipped: %s\n", path, err)
 			continue
 		} else if err != nil {
