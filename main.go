@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -16,15 +17,21 @@ type result struct {
 }
 
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: gjevt questions [state...]")
+	jsonOutput := flag.Bool("json", false, "print results as JSON")
+	flag.Usage = func() {
+		fmt.Fprintln(flag.CommandLine.Output(), "usage: gjevt [-json] questions [state...]")
+		flag.PrintDefaults()
+	}
+	flag.Parse()
+	if flag.NArg() < 1 {
+		flag.Usage()
 		os.Exit(2)
 	}
 
 	cfg, err := loadConfig("gjevt.hcl")
 	if err == nil {
-		err = run(context.Background(), NewClient(cfg), os.Args[1], os.Args[2:], os.Stdin,
-			os.Stdout)
+		err = run(context.Background(), NewClient(cfg), flag.Arg(0), flag.Args()[1:],
+			*jsonOutput, os.Stdin, os.Stdout)
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "gjevt:", err)
@@ -67,7 +74,7 @@ func readState(path string, stdin io.Reader) (any, error) {
 }
 
 func run(ctx context.Context, c *Client, questionsPath string, statePaths []string,
-	stdin io.Reader, stdout io.Writer) error {
+	jsonOutput bool, stdin io.Reader, stdout io.Writer) error {
 
 	var questions map[string]Question
 	if err := readJSON(questionsPath, stdin, &questions); err != nil {
@@ -83,7 +90,7 @@ func run(ctx context.Context, c *Client, questionsPath string, statePaths []stri
 
 	enc := json.NewEncoder(stdout)
 	enc.SetIndent("", "  ")
-	for _, path := range statePaths {
+	for i, path := range statePaths {
 		state, err := readState(path, stdin)
 		if err != nil {
 			return err
@@ -93,7 +100,16 @@ func run(ctx context.Context, c *Client, questionsPath string, statePaths []stri
 		if err != nil {
 			return fmt.Errorf("%s: %w", path, err)
 		}
-		if err := enc.Encode(result{State: path, DecisionResponse: resp}); err != nil {
+		res := result{State: path, DecisionResponse: resp}
+		if jsonOutput {
+			err = enc.Encode(res)
+		} else {
+			if i > 0 {
+				fmt.Fprintln(stdout)
+			}
+			err = printResult(stdout, res)
+		}
+		if err != nil {
 			return err
 		}
 	}

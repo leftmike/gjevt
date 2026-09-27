@@ -108,7 +108,7 @@ func TestRun(t *testing.T) {
 
 	var out bytes.Buffer
 	err := run(context.Background(), c, "examples/support_questions.json",
-		[]string{"examples/support_billing.json"}, nil, &out)
+		[]string{"examples/support_billing.json"}, true, nil, &out)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +134,8 @@ func TestRunMultipleStates(t *testing.T) {
 
 	var out bytes.Buffer
 	err := run(context.Background(), c, "examples/support_questions.json",
-		[]string{"examples/support_billing.json", "examples/support_login.json"}, nil, &out)
+		[]string{"examples/support_billing.json", "examples/support_login.json"}, true, nil,
+		&out)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +161,7 @@ func TestRunStdin(t *testing.T) {
 	defer done()
 
 	var out bytes.Buffer
-	err := run(context.Background(), c, "examples/support_questions.json", nil,
+	err := run(context.Background(), c, "examples/support_questions.json", nil, true,
 		strings.NewReader(`{"ticket": "help"}`), &out)
 	if err != nil {
 		t.Fatal(err)
@@ -193,7 +194,7 @@ func TestRunErrors(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := run(context.Background(), c, tc.questions, tc.states,
+			err := run(context.Background(), c, tc.questions, tc.states, false,
 				strings.NewReader(tc.stdin), io.Discard)
 			if err == nil || !strings.Contains(err.Error(), tc.err) {
 				t.Fatalf("got error %v, want %q", err, tc.err)
@@ -241,7 +242,7 @@ func TestRunTextState(t *testing.T) {
 	defer done()
 
 	err := run(context.Background(), c, "examples/support_questions.json",
-		[]string{"examples/support_refund.txt"}, nil, io.Discard)
+		[]string{"examples/support_refund.txt"}, false, nil, io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
