@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"testing"
 )
@@ -42,8 +43,9 @@ func TestRunPretty(t *testing.T) {
 	defer done()
 
 	var out bytes.Buffer
-	err := run(context.Background(), c, "examples/support_questions.json",
-		[]string{"examples/support_billing.json", "examples/support_refund.txt"}, false, nil, &out)
+	err := run(context.Background(), c, options{}, "examples/support_questions.json",
+		[]string{"examples/support_billing.json", "examples/support_refund.txt"}, nil, &out,
+		io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}

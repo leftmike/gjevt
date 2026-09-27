@@ -42,7 +42,11 @@ func formatConfidence(c *float64) string {
 }
 
 func printResult(w io.Writer, res result) error {
-	fmt.Fprintln(w, res.State)
+	if res.Truncated {
+		fmt.Fprintln(w, res.State, "(truncated)")
+	} else {
+		fmt.Fprintln(w, res.State)
+	}
 
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	names := make([]string, 0, len(res.Answers))

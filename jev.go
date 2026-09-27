@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 )
+
+var ErrTooLong = errors.New("state is too long")
 
 type Question struct {
 	Type         string `json:"type"`
@@ -82,6 +85,9 @@ func (c *Client) Decide(ctx context.Context, req DecisionRequest) (*DecisionResp
 		return nil, err
 	}
 	if hresp.StatusCode != http.StatusOK {
+		if bytes.Contains(b, []byte("max_tokens_exceeded")) {
+			return nil, ErrTooLong
+		}
 		return nil, fmt.Errorf("jev: %s: %s", hresp.Status, b)
 	}
 

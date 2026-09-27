@@ -12,14 +12,22 @@ import (
 )
 
 type result struct {
-	State string `json:"state"`
+	State     string `json:"state"`
+	Truncated bool   `json:"truncated,omitempty"`
 	*DecisionResponse
 }
 
+type options struct {
+	json bool
+	skip bool
+}
+
 func main() {
-	jsonOutput := flag.Bool("json", false, "print results as JSON")
+	var opts options
+	flag.BoolVar(&opts.json, "json", false, "print results as JSON")
+	flag.BoolVar(&opts.skip, "skip", false, "skip state which is too long instead of truncating it")
 	flag.Usage = func() {
-		fmt.Fprintln(flag.CommandLine.Output(), "usage: gjevt [-json] questions [state...]")
+		fmt.Fprintln(flag.CommandLine.Output(), "usage: gjevt [-json] [-skip] questions [state...]")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -30,8 +38,8 @@ func main() {
 
 	cfg, err := loadConfig("gjevt.hcl")
 	if err == nil {
-		err = run(context.Background(), NewClient(cfg), flag.Arg(0), flag.Args()[1:],
-			*jsonOutput, os.Stdin, os.Stdout)
+		err = run(context.Background(), NewClient(cfg), opts, flag.Arg(0), flag.Args()[1:],
+			os.Stdin, os.Stdout, os.Stderr)
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "gjevt:", err)
@@ -73,8 +81,27 @@ func readState(path string, stdin io.Reader) (any, error) {
 	return state, nil
 }
 
-func run(ctx context.Context, c *Client, questionsPath string, statePaths []string,
-	jsonOutput bool, stdin io.Reader, stdout io.Writer) error {
+func decide(ctx context.Context, c *Client, questions map[string]Question, state any,
+	skip bool) (*DecisionResponse, bool, error) {
+
+	truncated := false
+	for {
+		resp, err := c.Decide(ctx, DecisionRequest{State: state, Questions: questions})
+		if !errors.Is(err, ErrTooLong) || skip {
+			return resp, truncated, err
+		}
+
+		var shrunk bool
+		state, shrunk = truncateState(state, min(stateSize(state)*3/4, maxStateSize))
+		if !shrunk {
+			return nil, truncated, err
+		}
+		truncated = true
+	}
+}
+
+func run(ctx context.Context, c *Client, opts options, questionsPath string,
+	statePaths []string, stdin io.Reader, stdout, stderr io.Writer) error {
 
 	var questions map[string]Question
 	if err := readJSON(questionsPath, stdin, &questions); err != nil {
@@ -90,25 +117,31 @@ func run(ctx context.Context, c *Client, questionsPath string, statePaths []stri
 
 	enc := json.NewEncoder(stdout)
 	enc.SetIndent("", "  ")
-	for i, path := range statePaths {
+	printed := false
+	for _, path := range statePaths {
 		state, err := readState(path, stdin)
 		if err != nil {
 			return err
 		}
 
-		resp, err := c.Decide(ctx, DecisionRequest{State: state, Questions: questions})
-		if err != nil {
+		resp, truncated, err := decide(ctx, c, questions, state, opts.skip)
+		if errors.Is(err, ErrTooLong) && opts.skip {
+			fmt.Fprintf(stderr, "gjevt: %s: skipped: %s\n", path, err)
+			continue
+		} else if err != nil {
 			return fmt.Errorf("%s: %w", path, err)
 		}
-		res := result{State: path, DecisionResponse: resp}
-		if jsonOutput {
+
+		res := result{State: path, Truncated: truncated, DecisionResponse: resp}
+		if opts.json {
 			err = enc.Encode(res)
 		} else {
-			if i > 0 {
+			if printed {
 				fmt.Fprintln(stdout)
 			}
 			err = printResult(stdout, res)
 		}
+		printed = true
 		if err != nil {
 			return err
 		}
