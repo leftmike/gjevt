@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -31,20 +32,38 @@ func main() {
 	}
 }
 
-func readJSON(path string, stdin io.Reader, v any) error {
-	in := stdin
-	if path != "-" {
-		f, err := os.Open(path)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		in = f
+func readFile(path string, stdin io.Reader) ([]byte, error) {
+	if path == "-" {
+		return io.ReadAll(stdin)
 	}
-	if err := json.NewDecoder(in).Decode(v); err != nil {
+	return os.ReadFile(path)
+}
+
+func readJSON(path string, stdin io.Reader, v any) error {
+	b, err := readFile(path, stdin)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(b, v); err != nil {
 		return fmt.Errorf("%s: %w", path, err)
 	}
 	return nil
+}
+
+func readState(path string, stdin io.Reader) (any, error) {
+	b, err := readFile(path, stdin)
+	if err != nil {
+		return nil, err
+	}
+	b = bytes.TrimSpace(b)
+	if !bytes.HasPrefix(b, []byte("{")) {
+		return string(b), nil
+	}
+	var state any
+	if err := json.Unmarshal(b, &state); err != nil {
+		return nil, fmt.Errorf("%s: %w", path, err)
+	}
+	return state, nil
 }
 
 func run(ctx context.Context, c *Client, questionsPath string, statePaths []string,
@@ -65,8 +84,8 @@ func run(ctx context.Context, c *Client, questionsPath string, statePaths []stri
 	enc := json.NewEncoder(stdout)
 	enc.SetIndent("", "  ")
 	for _, path := range statePaths {
-		var state any
-		if err := readJSON(path, stdin, &state); err != nil {
+		state, err := readState(path, stdin)
+		if err != nil {
 			return err
 		}
 

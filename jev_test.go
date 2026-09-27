@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -198,5 +199,54 @@ func TestRunErrors(t *testing.T) {
 				t.Fatalf("got error %v, want %q", err, tc.err)
 			}
 		})
+	}
+}
+
+func TestReadState(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want any
+		err  bool
+	}{
+		{name: "text", in: "  hello world\n\n", want: "hello world"},
+		{name: "multiline text", in: "\nline one\nline two\n", want: "line one\nline two"},
+		{name: "json", in: "\n\t{\"a\": 1}\n", want: map[string]any{"a": 1.0}},
+		{name: "array is text", in: "[1, 2]", want: "[1, 2]"},
+		{name: "bad json", in: "{not json", err: true},
+		{name: "empty", in: " \n ", want: ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := readState("-", strings.NewReader(tc.in))
+			if tc.err {
+				if err == nil {
+					t.Fatalf("got %v, want error", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("got %#v, want %#v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestRunTextState(t *testing.T) {
+	var got map[string]any
+	c, done := newTestServer(t, http.StatusOK, testResponse, &got)
+	defer done()
+
+	err := run(context.Background(), c, "examples/support_questions.json",
+		[]string{"examples/support_refund.txt"}, nil, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, ok := got["state"].(string)
+	if !ok || !strings.HasPrefix(s, "Subject:") || strings.HasSuffix(s, "\n") {
+		t.Errorf("got state %#v", got["state"])
 	}
 }
